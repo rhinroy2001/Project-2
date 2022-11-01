@@ -170,6 +170,7 @@ void* communicateWithSender(char* smtpPortNumber){
                 parse = strtok(NULL, " ");
                 if(strncmp(parse, "447f22.edu", 10) == 0){
                     replyCode = "250 OK";
+                    prevMessage = "HELO";
                     bzero(buf, sizeof(buf));
                     sprintf(buf, "%s %s greets %s", replyCode, ip, client.host);
                     if((rv = sendto(newfd, buf, sizeof(buf), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
@@ -179,12 +180,21 @@ void* communicateWithSender(char* smtpPortNumber){
                     printf("%s\n", buf);
                 }else{
                     replyCode = "501 DOMAIN NOT SUPPORTED\n";
+                    prevMessage = "";
                     if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                         perror("sendto");
                         exit(1);
                     }
                     printf("%s\n", replyCode);
                 }
+            }else{
+                replyCode = "500 command unrecognized";
+                prevMessage = "";
+                if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                    perror("sendto");
+                    exit(1);
+                }
+                printf("%s\n", replyCode);
             }
 
 
@@ -197,7 +207,30 @@ void* communicateWithSender(char* smtpPortNumber){
                     perror("recvfrom");
                     exit(1);
                 }
-                if(strncmp("MAIL FROM", buf, 9) == 0){
+                if(strncmp("HELO", buf, 4) == 0 && strcmp("", prevMessage) == 0){
+                    helo = buf;
+                    parse = strtok(helo, " ");
+                    parse = strtok(NULL, " ");
+                    if(strncmp(parse, "447f22.edu", 10) == 0){
+                        replyCode = "250 OK";
+                        prevMessage = "HELO";
+                        bzero(buf, sizeof(buf));
+                        sprintf(buf, "%s %s greets %s", replyCode, ip, client.host);
+                        if((rv = sendto(newfd, buf, sizeof(buf), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        printf("%s\n", buf);
+                    }else{
+                        replyCode = "501 DOMAIN NOT SUPPORTED\n";
+                        prevMessage = "";
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        printf("%s\n", replyCode);
+                    }
+                }else if(strncmp("MAIL FROM", buf, 9) == 0 && strncmp("HELO", prevMessage, 4) == 0){
                     mailFrom = buf;
                     parse = strtok(mailFrom, "<");
                     while(parse != NULL){
