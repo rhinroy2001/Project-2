@@ -18,9 +18,18 @@
 #define MAXBUFLEN 1000
 
 struct client_info{
-    struct sockaddr_storage their_addr;
-    char* prevMessage;
+    char host[INET_ADDRSTRLEN];
+    int port;
 };
+
+struct client_info get_client_info(struct sockaddr_in *sa){
+    struct client_info info = {};
+    info.port = ntohs(sa->sin_port);
+    inet_ntop(sa->sin_family, &(sa->sin_addr), info.host, INET_ADDRSTRLEN);
+
+    return info;
+}
+
 
 // get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
@@ -35,14 +44,13 @@ void *get_in_addr(struct sockaddr *sa)
 void* communicateWithSender(char* smtpPortNumber){
     int sockfd;
     struct addrinfo hints, *servinfo, *p;
-    struct sockaddr_storage their_addr;
+    struct sockaddr_in their_addr;
     socklen_t addr_len;
     char buf[MAXBUFLEN];
     int rv;
     int numbytes;
     char* clientMessage;
     char* replyCode;
-    char* prevClientMessage;
     char* helo;
     char* mailFrom;
     char* rcptTo;
@@ -62,6 +70,14 @@ void* communicateWithSender(char* smtpPortNumber){
     struct tm *ptm = gmtime(&now);
     int portNumberi = atoi(smtpPortNumber);
     char portNumber[40];
+    char* mailFromMessage = "MAIL FROM";
+    char* rcptToMessage = "RCPT TO";
+    char* emptyMessage = "";
+    char* dataMessage = "DATA";
+    char host[256];
+    struct hostent *host_entry;
+    char* ip;
+    char* prevMessage;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET; // set to AF_INET to use IPv4
@@ -94,19 +110,20 @@ void* communicateWithSender(char* smtpPortNumber){
         exit(1);
     }
 
+    gethostname(host, sizeof(host));
+    host_entry = gethostbyname(host);
+    ip = inet_ntoa(*((struct in_addr*) host_entry->h_addr_list[0]));
+
     freeaddrinfo(servinfo);
 
     addr_len = sizeof(their_addr);
 
     
 
+    
+
 
     rv = mkdir("db", 0755);
-    if(!rv){
-        printf("db directory created\n");
-    }else{
-        printf("failed to create db directory\n");
-    }
     
     // while(1){
     //     bzero(buf, MAXBUFLEN);
@@ -133,6 +150,7 @@ void* communicateWithSender(char* smtpPortNumber){
     // }
 
         for(;;){
+
             replyCode = "";
             bzero(buf, sizeof(buf));
             if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
@@ -140,18 +158,20 @@ void* communicateWithSender(char* smtpPortNumber){
                 perror("recvfrom");
                 exit(1);
             }
+            struct client_info client = get_client_info(&their_addr);
             if(strncmp("HELO", buf, 4) == 0){
                 helo = buf;
                 parse = strtok(helo, " ");
                 parse = strtok(NULL, " ");
-                printf("%s\n", parse);
                 if(strncmp(parse, "447f22.edu", 10) == 0){
                     replyCode = "250 OK";
-                    if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                    bzero(buf, sizeof(buf));
+                    sprintf(buf, "%s %s greets %s", replyCode, ip, client.host);
+                    if((rv = sendto(sockfd, buf, sizeof(buf), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                         perror("sendto");
                         exit(1);
                     }
-                    printf("%s\n", replyCode);
+                    printf("%s\n", buf);
                 }else{
                     replyCode = "501 DOMAIN NOT SUPPORTED\n";
                     if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
@@ -162,7 +182,7 @@ void* communicateWithSender(char* smtpPortNumber){
                 }
             
             }else if(strncmp("MAIL FROM", buf, 9) == 0){
-                prevClientMessage = "MAIL FROM";
+                prevMessage = "MAIL FROM";
                 replyCode = "250 OK";
                 mailFrom = buf;
                 parse = strtok(mailFrom, "<");
@@ -173,12 +193,9 @@ void* communicateWithSender(char* smtpPortNumber){
                         break;
                     }
                 }
-                printf("%s\n", temp);
                 parse = strtok(temp, "@");
-                printf("%s\n", parse);
                 sprintf(from, "From: <%s@447f22.edu>\n", parse);
                 parse = strtok(NULL, "@");
-                printf("%s\n", parse);
                 if(strncmp(parse, "447f22.edu>", 11) == 0){
                     if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                         perror("sendto");
@@ -194,8 +211,8 @@ void* communicateWithSender(char* smtpPortNumber){
                     printf("%s\n", replyCode);
                 }
             }else if(strncmp("RCPT TO", buf, 7) == 0){
-                if(strncmp("MAIL FROM", prevClientMessage, 10) == 0){
-                    prevClientMessage = "RCPT TO";
+                if(strncmp("MAIL FROM", prevMessage, 10) == 0){
+                    prevMessage = "RCPT TO";
                     replyCode = "250 OK";
                     rcptTo = buf;
                     parse = strtok(rcptTo, "<");
@@ -211,11 +228,6 @@ void* communicateWithSender(char* smtpPortNumber){
                     sprintf(path, "db/%s", parse);
                     sprintf(to, "To: <%s@447f22.edu>\n", recipient);
                     rv = mkdir(path, 0755);
-                    if(!rv){
-                        printf("recipient directory created\n");
-                    }else{
-                        printf("failed to create recipient directory\n");
-                    }
                     if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                         perror("sendto");
                         exit(1);
@@ -230,8 +242,8 @@ void* communicateWithSender(char* smtpPortNumber){
                     printf("%s\n", replyCode);
                 }
             }else if(strncmp("DATA", buf, 4) == 0){
-                if(strncmp("RCPT TO", prevClientMessage, 8) == 0){
-                    prevClientMessage = "DATA";
+                if(strncmp("RCPT TO", prevMessage, 8) == 0){
+                    prevMessage = "DATA";
                     replyCode = "354 OK";
                     data = buf;
                     if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
@@ -247,8 +259,8 @@ void* communicateWithSender(char* smtpPortNumber){
                     }
                     printf("%s\n", replyCode);
                 }
-            }else if(strncmp(prevClientMessage, "DATA", 4) == 0){
-                prevClientMessage = "";
+            }else if(strncmp(prevMessage, "DATA", 4) == 0){
+                prevMessage = "";
                 replyCode = "250 OK\n";
                 sprintf(path, "db/%s/%d.email", recipient, num);
                 num++;
@@ -268,7 +280,7 @@ void* communicateWithSender(char* smtpPortNumber){
                 printf("%s\n", replyCode);
 
             }else if(strncmp("HELP", buf, 4) == 0){
-                prevClientMessage = ""; 
+                prevMessage = "";
                 replyCode = "214 OK"; // WRITE HELP MENU
                 if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                     perror("sendto");
