@@ -19,6 +19,7 @@
 int main(int argc, char *argv[])
 {
     struct addrinfo hints, *servinfo, *p;
+    struct sockaddr_in their_addr;
     int sockfd;
     int newfd;
     int rv;
@@ -85,6 +86,23 @@ int main(int argc, char *argv[])
         return 2;
     }
 
+    while((buf[n++] = getchar()) != '\n');
+
+    if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0, p->ai_addr, p->ai_addrlen)) == -1) {
+        perror("talker: sendto");
+        exit(1);
+    }
+    bzero(buf, sizeof(buf));
+    addr_len = sizeof(their_addr);
+    if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, &addr_len) == -1)){
+        perror("recvfrom");
+        exit(1);
+    }
+    printf("%s\n", buf);
+
+    
+
+
     for(;;){
         n = 0;
         j = 0;
@@ -108,13 +126,12 @@ int main(int argc, char *argv[])
             bzero(buf, sizeof(buf));
             while((buf[n++] = getchar()) != '\n');
         }
-        if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0, p->ai_addr, p->ai_addrlen)) == -1) {
+        if ((numbytes = sendto(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, addr_len) == -1)) {
             perror("talker: sendto");
             exit(1);
         }
         bzero(buf, sizeof(buf));
-        addr_len = sizeof(ipAddress);
-        if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) ipAddress, &addr_len) == -1)){
+        if((numbytes = recvfrom(sockfd, buf, sizeof(buf), 0, (struct sockaddr*) &their_addr, &addr_len) == -1)){
             perror("recvfrom");
             exit(1);
         }
