@@ -100,11 +100,6 @@ int main(int argc, char *argv[])
         strcpy(username, buf);
 
         rv = mkdir(username, 0755);
-        if(!rv){
-            printf("User directory created\n");
-        }else{
-            printf("Failed to create user directory\n");
-        }
 
         bzero(buf, sizeof(buf));
         printf("Enter the number of emails to download: ");
