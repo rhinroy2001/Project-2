@@ -179,7 +179,7 @@ void* communicateWithSender(char* smtpPortNumber){
                     }
                     printf("%s\n", buf);
                 }else{
-                    replyCode = "501 DOMAIN NOT SUPPORTED\n";
+                    replyCode = "501 DOMAIN NOT SUPPORTED";
                     prevMessage = "";
                     if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                         perror("sendto");
@@ -222,7 +222,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         }
                         printf("%s\n", buf);
                     }else{
-                        replyCode = "501 DOMAIN NOT SUPPORTED\n";
+                        replyCode = "501 DOMAIN NOT SUPPORTED";
                         prevMessage = "";
                         if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                             perror("sendto");
@@ -252,7 +252,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         }
                         printf("%s\n", replyCode);
                     }else{
-                        replyCode = "501 DOMAIN NOT SUPPORTED\n";
+                        replyCode = "501 DOMAIN NOT SUPPORTED";
                         if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                             perror("sendto");
                             exit(1);
@@ -285,7 +285,7 @@ void* communicateWithSender(char* smtpPortNumber){
                             }
                             printf("%s\n", replyCode);
                         }else{
-                            replyCode = "501 DOMAIN NOT SUPPORTED\n";
+                            replyCode = "501 DOMAIN NOT SUPPORTED";
                             if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                                 perror("sendto");
                                 exit(1);
@@ -340,7 +340,7 @@ void* communicateWithSender(char* smtpPortNumber){
 
                 }else if(strncmp("HELP", buf, 4) == 0){
                     prevMessage = "";
-                    replyCode = "214 OK"; // WRITE HELP MENU
+                    replyCode = "214 OK\nHELO - HELO followed by email domain\nMAIL FROM - MAIL FROM: <email address>\nRCPT TO - RCPT TO: <email address>\nDATA - DATA then write text ending <CRLF>.<CRLF>\n";
                     if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                         perror("sendto");
                         exit(1);
