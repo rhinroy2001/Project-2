@@ -118,36 +118,8 @@ void* communicateWithSender(char* smtpPortNumber){
 
     addr_len = sizeof(their_addr);
 
-    
-
-    
-
-
     rv = mkdir("db", 0755);
     
-    // while(1){
-    //     bzero(buf, MAXBUFLEN);
-    //     if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
-    //             (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-    //             perror("recvfrom");
-    //             exit(1);
-    //     }
-    //     while(strncmp("HELO", buf, 4) != 0){
-    //         if(strncmp("HELO", buf, 4) == 0){
-    //             replyCode = "250 OK";
-    //             if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
-    //                 perror("sendto");
-    //                 exit(1);
-    //             }
-    //             break;
-    //         }
-    //         if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
-    //             (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-    //             perror("recvfrom");
-    //             exit(1);
-    //         }
-    //     }
-    // }
     while(1){
         portNumberi++;
         sprintf(portNumber, "%d", portNumberi);
