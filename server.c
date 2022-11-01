@@ -319,7 +319,7 @@ void* communicateWithSender(char* smtpPortNumber){
                         printf("%s\n", replyCode);
                     }
                 }else if(strncmp(prevMessage, "DATA", 4) == 0){
-                    prevMessage = "";
+                    prevMessage = "HELO";
                     replyCode = "250 OK\n";
                     sprintf(path, "db/%s/%d.email", recipient, num);
                     num++;
@@ -435,16 +435,18 @@ void* commincateWithReceiver(char* httpPortNumber){
     freeaddrinfo(servinfo);
 
     addr_len = sizeof(their_addr); 
-    gethostname(host, sizeof(host));
-    sprintf(hostname, "<%s>", host);
     
     for(;;){
+        gethostname(host, sizeof(host));
+        sprintf(hostname, "<%s>", host);
         replyCode = "";
         bzero(buf, sizeof(buf));
         if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0, (struct sockaddr *)&their_addr, &addr_len)) == -1) {
             perror("recvfrom");
             exit(1);
         }
+
+        printf("%s\n", buf);
         
         if(strncmp("GET", buf, 3) == 0){
             request = buf;
@@ -485,8 +487,8 @@ void* commincateWithReceiver(char* httpPortNumber){
             parse = strtok(NULL, " ");
             count = parse;
             emailCount = atoi(count);
-            sprintf(dateTime, "%s\n", asctime(ptm));
-
+            sprintf(dateTime, "%s", asctime(ptm));
+            printf("Server: %s Hostname: %s", server, hostname);
             if(strcmp(server, hostname) == 0){
                 bzero(buf, sizeof(buf));
                 
@@ -523,6 +525,7 @@ void* commincateWithReceiver(char* httpPortNumber){
                 printf("%s\n", buf);
             }else{
                 replyCode = "400 BAD REQUEST\n";
+                printf("its this one\n");
                 if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                     perror("sendto");
                     exit(1);
@@ -588,8 +591,9 @@ int main(int argc, char* argv[])
     
     // pthread_create(&tid[count++], NULL, commincateWithReceiver, (void*)httpSocket);
     // pthread_create(&tid[count++], NULL, communicateWithSender, (void*)smtpPortNumber);
-
-    communicateWithSender(smtpPortNumber);
+    if(!fork()){
+        communicateWithSender(smtpPortNumber);
+    }
     commincateWithReceiver(httpPortNumber);
 
 
