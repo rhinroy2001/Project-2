@@ -445,8 +445,6 @@ void* commincateWithReceiver(char* httpPortNumber){
             perror("recvfrom");
             exit(1);
         }
-
-        printf("%s\n", buf);
         
         if(strncmp("GET", buf, 3) == 0){
             request = buf;
@@ -525,7 +523,6 @@ void* commincateWithReceiver(char* httpPortNumber){
                 printf("%s\n", buf);
             }else{
                 replyCode = "400 BAD REQUEST\n";
-                printf("its this one\n");
                 if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                     perror("sendto");
                     exit(1);
