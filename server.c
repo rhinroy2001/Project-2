@@ -148,17 +148,22 @@ void* communicateWithSender(char* smtpPortNumber){
     //         }
     //     }
     // }
-
-        for(;;){
-
-            replyCode = "";
-            bzero(buf, sizeof(buf));
-            if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
-                (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-                perror("recvfrom");
+    while(1){
+        portNumberi++;
+        sprintf(portNumber, "%d", portNumberi);
+        if ((numbytes = recvfrom(sockfd, buf, MAXBUFLEN-1 , 0,
+            (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+            perror("recvfrom");
+            exit(1);
+        }
+        struct client_info client = get_client_info(&their_addr);
+        if(!fork()){
+            if ((rv = getaddrinfo(NULL, portNumber, &hints, &servinfo)) != 0) {
+                fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
                 exit(1);
             }
-            struct client_info client = get_client_info(&their_addr);
+            int newfd = socket(AF_INET, SOCK_DGRAM, 0);
+            bind(newfd, p->ai_addr, p->ai_addrlen);
             if(strncmp("HELO", buf, 4) == 0){
                 helo = buf;
                 parse = strtok(helo, " ");
@@ -167,55 +172,36 @@ void* communicateWithSender(char* smtpPortNumber){
                     replyCode = "250 OK";
                     bzero(buf, sizeof(buf));
                     sprintf(buf, "%s %s greets %s", replyCode, ip, client.host);
-                    if((rv = sendto(sockfd, buf, sizeof(buf), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                    if((rv = sendto(newfd, buf, sizeof(buf), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                         perror("sendto");
                         exit(1);
                     }
                     printf("%s\n", buf);
                 }else{
                     replyCode = "501 DOMAIN NOT SUPPORTED\n";
-                    if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                    if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                         perror("sendto");
                         exit(1);
                     }
                     printf("%s\n", replyCode);
                 }
-            
-            }else if(strncmp("MAIL FROM", buf, 9) == 0){
-                prevMessage = "MAIL FROM";
-                replyCode = "250 OK";
-                mailFrom = buf;
-                parse = strtok(mailFrom, "<");
-                while(parse != NULL){
-                    temp = parse;
-                    parse = strtok(NULL, "<");
-                    if(parse == NULL){
-                        break;
-                    }
+            }
+
+
+            for(;;){
+
+                replyCode = "";
+                bzero(buf, sizeof(buf));
+                if ((numbytes = recvfrom(newfd, buf, MAXBUFLEN-1 , 0,
+                    (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+                    perror("recvfrom");
+                    exit(1);
                 }
-                parse = strtok(temp, "@");
-                sprintf(from, "From: <%s@447f22.edu>\n", parse);
-                parse = strtok(NULL, "@");
-                if(strncmp(parse, "447f22.edu>", 11) == 0){
-                    if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
-                        perror("sendto");
-                        exit(1);
-                    }
-                    printf("%s\n", replyCode);
-                }else{
-                    replyCode = "501 DOMAIN NOT SUPPORTED\n";
-                    if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
-                        perror("sendto");
-                        exit(1);
-                    }
-                    printf("%s\n", replyCode);
-                }
-            }else if(strncmp("RCPT TO", buf, 7) == 0){
-                if(strncmp("MAIL FROM", prevMessage, 10) == 0){
-                    prevMessage = "RCPT TO";
+                if(strncmp("MAIL FROM", buf, 9) == 0){
+                    prevMessage = "MAIL FROM";
                     replyCode = "250 OK";
-                    rcptTo = buf;
-                    parse = strtok(rcptTo, "<");
+                    mailFrom = buf;
+                    parse = strtok(mailFrom, "<");
                     while(parse != NULL){
                         temp = parse;
                         parse = strtok(NULL, "<");
@@ -224,85 +210,118 @@ void* communicateWithSender(char* smtpPortNumber){
                         }
                     }
                     parse = strtok(temp, "@");
-                    strcpy(recipient, parse);
-                    sprintf(path, "db/%s", parse);
-                    sprintf(to, "To: <%s@447f22.edu>\n", recipient);
-                    rv = mkdir(path, 0755);
-                    if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                    sprintf(from, "From: <%s@447f22.edu>\n", parse);
+                    parse = strtok(NULL, "@");
+                    if(strncmp(parse, "447f22.edu>", 11) == 0){
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        printf("%s\n", replyCode);
+                    }else{
+                        replyCode = "501 DOMAIN NOT SUPPORTED\n";
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        printf("%s\n", replyCode);
+                    }
+                }else if(strncmp("RCPT TO", buf, 7) == 0){
+                    if(strncmp("MAIL FROM", prevMessage, 10) == 0){
+                        prevMessage = "RCPT TO";
+                        replyCode = "250 OK";
+                        rcptTo = buf;
+                        parse = strtok(rcptTo, "<");
+                        while(parse != NULL){
+                            temp = parse;
+                            parse = strtok(NULL, "<");
+                            if(parse == NULL){
+                                break;
+                            }
+                        }
+                        parse = strtok(temp, "@");
+                        strcpy(recipient, parse);
+                        sprintf(path, "db/%s", parse);
+                        sprintf(to, "To: <%s@447f22.edu>\n", recipient);
+                        rv = mkdir(path, 0755);
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        printf("%s\n", replyCode);
+                    }else{
+                        replyCode = "503 BAD SEQUENCE OF COMMANDS";
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        printf("%s\n", replyCode);
+                    }
+                }else if(strncmp("DATA", buf, 4) == 0){
+                    if(strncmp("RCPT TO", prevMessage, 8) == 0){
+                        prevMessage = "DATA";
+                        replyCode = "354 OK";
+                        data = buf;
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        printf("%s\n", replyCode);
+                    }else{
+                        replyCode = "503 BAD SEQUENCE OF COMMANDS";
+                        if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                            perror("sendto");
+                            exit(1);
+                        }
+                        printf("%s\n", replyCode);
+                    }
+                }else if(strncmp(prevMessage, "DATA", 4) == 0){
+                    prevMessage = "";
+                    replyCode = "250 OK\n";
+                    sprintf(path, "db/%s/%d.email", recipient, num);
+                    num++;
+                    sprintf(dateTime, "Date: %s", asctime(ptm));
+                    fp = fopen(path, "w");
+                    fputs(dateTime, fp);
+                    fputs(from, fp);
+                    fputs(to, fp);
+                    for(int i = 0; i < MAXBUFLEN; i++){
+                        fputc(buf[i], fp);
+                    }
+                    fclose(fp);
+                    if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
                         perror("sendto");
                         exit(1);
                     }
                     printf("%s\n", replyCode);
-                }else{
-                    replyCode = "503 BAD SEQUENCE OF COMMANDS";
-                    if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
-                        perror("sendto");
-                        exit(1);
-                    }
-                    printf("%s\n", replyCode);
-                }
-            }else if(strncmp("DATA", buf, 4) == 0){
-                if(strncmp("RCPT TO", prevMessage, 8) == 0){
-                    prevMessage = "DATA";
-                    replyCode = "354 OK";
-                    data = buf;
-                    if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
-                        perror("sendto");
-                        exit(1);
-                    }
-                    printf("%s\n", replyCode);
-                }else{
-                    replyCode = "503 BAD SEQUENCE OF COMMANDS";
-                    if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
-                        perror("sendto");
-                        exit(1);
-                    }
-                    printf("%s\n", replyCode);
-                }
-            }else if(strncmp(prevMessage, "DATA", 4) == 0){
-                prevMessage = "";
-                replyCode = "250 OK\n";
-                sprintf(path, "db/%s/%d.email", recipient, num);
-                num++;
-                sprintf(dateTime, "Date: %s", asctime(ptm));
-                fp = fopen(path, "w");
-                fputs(dateTime, fp);
-                fputs(from, fp);
-                fputs(to, fp);
-                for(int i = 0; i < MAXBUFLEN; i++){
-                    fputc(buf[i], fp);
-                }
-                fclose(fp);
-                if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
-                    perror("sendto");
-                    exit(1);
-                }
-                printf("%s\n", replyCode);
 
-            }else if(strncmp("HELP", buf, 4) == 0){
-                prevMessage = "";
-                replyCode = "214 OK"; // WRITE HELP MENU
-                if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
-                    perror("sendto");
-                    exit(1);
+                }else if(strncmp("HELP", buf, 4) == 0){
+                    prevMessage = "";
+                    replyCode = "214 OK"; // WRITE HELP MENU
+                    if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                        perror("sendto");
+                        exit(1);
+                    }
+                    printf("%s\n", replyCode);
+                }else if(strncmp("QUIT", buf, 4) == 0){
+                    replyCode = "221 BYE";
+                    if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                        perror("sendto");
+                        exit(1);
+                    }
+                    printf("%s\n", replyCode);
+                }else{
+                    replyCode = "500 command unrecognized";
+                    if((rv = sendto(newfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
+                        perror("sendto");
+                        exit(1);
+                    }
+                    printf("%s\n", replyCode);
                 }
-                printf("%s\n", replyCode);
-            }else if(strncmp("QUIT", buf, 4) == 0){
-                replyCode = "221 BYE";
-                if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
-                    perror("sendto");
-                    exit(1);
-                }
-                printf("%s\n", replyCode);
-            }else{
-                replyCode = "500 command unrecognized";
-                if((rv = sendto(sockfd, replyCode, strlen(replyCode), 0, (struct sockaddr *)&their_addr, addr_len)) == -1){
-                    perror("sendto");
-                    exit(1);
-                }
-                printf("%s\n", replyCode);
             }
+            close(newfd);
         }
+    }
     
     close(sockfd);
 }
