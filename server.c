@@ -549,24 +549,10 @@ int main(int argc, char* argv[])
         }
     }
 
-    // char *httpSocket = malloc(sizeof(char));
-    // *httpSocket = httpPortNumber;
-
-    // int server_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    // int client_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    // struct sockaddr_in sockaddr_to;
-    // fill sockaddr
-
-    
-    // pthread_create(&tid[count++], NULL, commincateWithReceiver, (void*)httpSocket);
-    // pthread_create(&tid[count++], NULL, communicateWithSender, (void*)smtpPortNumber);
     if(!fork()){
         communicateWithSender(smtpPortNumber);
     }
     commincateWithReceiver(httpPortNumber);
-
-
-    // close(sockfd);
 
     return 0;
 }
